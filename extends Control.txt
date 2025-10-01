@@ -1,0 +1,62 @@
+extends Control
+
+# ต้องเชื่อมโยง (Link) โค้ดนี้กับ Node UI ของคุณใน Godot Editor
+# วิธีทำ: ใน Godot Editor ให้ลาก Node UI (เช่น Label) มาวางบน "@onready var"
+@onready var username_label: Label = $"Panel/UsernameLabel"
+@onready var level_label: Label = $"Panel/LevelLabel"
+@onready var gold_label: Label = $"Panel/CurrencyBox/GoldLabel"
+@onready var titanium_label: Label = $"Panel/CurrencyBox/TitaniumLabel"
+@onready var rank_label: Label = $"Panel/RankBox/RankTierLabel"
+@onready var matches_label: Label = $"Panel/StatBox/TotalMatchesLabel"
+
+# สำหรับหน้าตั้งชื่อ/แลกโค้ด
+@onready var redeem_code_input: LineEdit = $"RedeemPanel/CodeInput"
+@onready var redeem_button: Button = $"RedeemPanel/RedeemButton"
+
+
+func _ready():
+    # ตรวจสอบว่า GameData ถูกตั้งค่าเป็น Autoload แล้ว
+    if not Engine.has_singleton("GameData"):
+        print("Error: GameData Singleton ไม่ถูกโหลด! ระบบจะไม่ทำงาน.")
+        return
+        
+    # เชื่อมต่อสัญญาณ (Signal) เมื่อข้อมูลมีการเปลี่ยนแปลง
+    GameData.connect("currency_changed", Callable(self, "update_currency_display"))
+    GameData.connect("profile_data_changed", Callable(self, "update_profile_display"))
+
+    # ตั้งค่าการเชื่อมต่อปุ่ม
+    redeem_button.pressed.connect(_on_redeem_button_pressed)
+
+    # โหลดข้อมูลครั้งแรก
+    update_profile_display()
+    update_currency_display()
+
+
+# === ฟังก์ชันอัปเดต ===
+func update_currency_display():
+    # ดึงข้อมูล Gold และ Titanium มาแสดง
+    gold_label.text = str(GameData.gold)
+    titanium_label.text = str(GameData.titanium)
+    
+func update_profile_display():
+    # ดึงข้อมูล Profile และสถิติมาแสดง
+    username_label.text = GameData.username
+    level_label.text = "Lv." + str(GameData.player_level)
+    rank_label.text = GameData.rank_tier
+    matches_label.text = "Matches: " + str(GameData.total_matches)
+    
+    # *Note: ต้องใช้โค้ดเพิ่มเติมเพื่อเปลี่ยน Texture/Sprite ของตัวละครตาม GameData.equipped_character*
+
+
+# === ฟังก์ชันการทำงานปุ่ม ===
+func _on_redeem_button_pressed():
+    var code = redeem_code_input.text
+    if code.is_empty():
+        print("โปรดกรอกโค้ด!")
+        return
+        
+    # เรียกใช้ตรรกะแลกโค้ดจาก Global Node
+    GameData.redeem_code(code)
+    redeem_code_input.clear() # ล้างช่องกรอกหลังจากกด
+
+# *Note: คุณต้องมีปุ่มสำหรับซื้อสินค้าในร้านค้า (Shop) และเชื่อมโยงสัญญาณของปุ่มนั้นกับ GameData.buy_item()*
