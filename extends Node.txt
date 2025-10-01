@@ -1,0 +1,132 @@
+extends Node
+
+# --- ข้อมูลพื้นฐานของผู้เล่น ---
+var username: String = "ผู้เล่นใหม่"
+var user_id: String = "86985539"
+var player_level: int = 1
+var current_xp: int = 0
+var next_level_xp: int = 1000
+
+# --- สกุลเงิน ---
+var gold: int = 500
+var titanium: int = 10
+
+# --- สถิติการเล่น (สำหรับหน้า Profile) ---
+var rank_tier: String = "S47" 
+var rank_points: int = 546 
+var total_matches: int = 0
+var total_wins: int = 0
+
+# --- การติดตั้ง (สำหรับหน้า Lobby) ---
+var equipped_character: String = "RedHood" # ตัวละครที่กำลังใส่
+var equipped_pet: String = "Crono"         # Pet ที่กำลังใส่
+
+# Dictionary สำหรับสินค้าในร้านค้า (ราคาและประเภท)
+# Key: ID สินค้า, Value: {gold_cost, titanium_cost, type}
+var shop_items = {
+    "red_hood_skin": {"gold_cost": 0, "titanium_cost": 250, "type": "Character"},
+    "blue_jacket_skin": {"gold_cost": 5000, "titanium_cost": 0, "type": "Character"},
+    "gacha_box_common": {"gold_cost": 1000, "titanium_cost": 0, "type": "LootBox"},
+    "titan_sword": {"gold_cost": 0, "titanium_cost": 50, "type": "MeleeWeapon"},
+}
+
+# Dictionary เพื่อติดตามโค้ดที่ถูกใช้ไปแล้ว
+var used_codes: Array[String] = []
+
+
+# ==============================================================================
+# 1. ฟังก์ชันจัดการชื่อ (Name Setter Logic)
+# ==============================================================================
+
+func set_username(new_name: String) -> bool:
+    # ตรวจสอบความยาวชื่อ
+    if new_name.length() >= 3 and new_name.length() <= 12:
+        username = new_name
+        print("ตั้งชื่อสำเร็จ: " + username)
+        # ใช้ 'emit_signal' เพื่อให้ UI (หน้าจอ) รับรู้ว่าต้องอัปเดต
+        emit_signal("profile_data_changed") 
+        return true
+    else:
+        print("ชื่อต้องมีความยาวระหว่าง 3 ถึง 12 ตัวอักษร")
+        return false
+
+# ==============================================================================
+# 2. ฟังก์ชันจัดการสกุลเงิน
+# ==============================================================================
+
+# ใช้เพื่อเพิ่มเงิน (จากการเก็บในเกม/ภารกิจ)
+func add_gold(amount: int):
+    gold += amount
+    emit_signal("currency_changed")
+
+# ใช้เพื่อเพิ่มไทเทเนียม (จากการซื้อ/โค้ด)
+func add_titanium(amount: int):
+    titanium += amount
+    emit_signal("currency_changed")
+
+# ==============================================================================
+# 3. ฟังก์ชันระบบร้านค้า (Shop Logic)
+# ==============================================================================
+
+func buy_item(item_id: String) -> bool:
+    if not shop_items.has(item_id):
+        print("Error: ไม่พบ Item ID: " + item_id)
+        return false
+
+    var item = shop_items[item_id]
+    var gold_cost = item.get("gold_cost", 0)
+    var titanium_cost = item.get("titanium_cost", 0)
+
+    # ตรวจสอบเงิน
+    if gold_cost > 0 and gold >= gold_cost:
+        gold -= gold_cost
+    elif titanium_cost > 0 and titanium >= titanium_cost:
+        titanium -= titanium_cost
+    else:
+        print("Error: สกุลเงินไม่เพียงพอในการซื้อ " + item_id)
+        return false
+
+    # ดำเนินการหลังการซื้อ (เช่น ให้สกิน/อาวุธ)
+    print("ซื้อ " + item_id + " สำเร็จ!")
+    
+    # *Note: ตรรกะการเพิ่มไอเทมเข้า Inventory ต้องเขียนเพิ่มเติม*
+
+    emit_signal("currency_changed")
+    return true
+
+# ==============================================================================
+# 4. ฟังก์ชันระบบแลกโค้ด (Redeem Code)
+# ==============================================================================
+
+func redeem_code(code: String):
+    code = code.to_upper() # ทำให้เป็นตัวพิมพ์ใหญ่ทั้งหมด
+    
+    if code in used_codes:
+        print("Error: โค้ดนี้ถูกใช้ไปแล้ว")
+        return
+
+    var rewards = check_code_validity(code)
+    
+    if rewards != null:
+        add_gold(rewards.get("gold", 0))
+        add_titanium(rewards.get("titanium", 0))
+        
+        # เพิ่มโค้ดลงในรายการที่ใช้แล้ว
+        used_codes.append(code)
+        
+        print("แลกโค้ดสำเร็จ! ได้รับ: Gold " + str(rewards.get("gold", 0)) + ", Titanium " + str(rewards.get("titanium", 0)))
+        
+    else:
+        print("Error: โค้ดไม่ถูกต้องหรือไม่สามารถใช้งานได้")
+
+# ฟังก์ชันจำลองการตรวจสอบโค้ดจากฐานข้อมูล/เซิร์ฟเวอร์
+func check_code_validity(code: String) -> Dictionary:
+    match code:
+        "FREEFIRE-TITANIUM":
+            return {"titanium": 50, "gold": 0}
+        "LOBBY-SKIN":
+            return {"gold": 2500, "titanium": 10}
+        "WEAPON-BOOST":
+            return {"gold": 0, "titanium": 20}
+        _:
+            return null
